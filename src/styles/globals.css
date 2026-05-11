@@ -1,26 +1,128 @@
 @import "tailwindcss";
 
+/* ── Apple-inspired Design Tokens ──────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Backgrounds */
+  --bg-primary:   #000000;
+  --bg-secondary: #1C1C1E;
+  --bg-tertiary:  #2C2C2E;
+  --bg-grouped:   #1C1C1E;
+
+  /* Labels */
+  --label-primary:   #FFFFFF;
+  --label-secondary: rgba(255,255,255,0.6);
+  --label-tertiary:  rgba(255,255,255,0.3);
+
+  /* Separators */
+  --separator:     rgba(255,255,255,0.06);
+  --separator-opaque: #38383A;
+
+  /* Fills */
+  --fill-primary:   rgba(255,255,255,0.12);
+  --fill-secondary: rgba(255,255,255,0.08);
+
+  /* System colors (Apple dark) */
+  --blue:   #0A84FF;
+  --green:  #30D158;
+  --red:    #FF453A;
+  --orange: #FF9F0A;
+  --yellow: #FFD60A;
+  --purple: #BF5AF2;
+  --teal:   #5AC8F5;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--bg-primary);
+  --color-foreground: var(--label-primary);
+  --font-sans: system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+  --font-mono: 'Fira Code', 'SF Mono', 'Roboto Mono', monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ── Base ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg-primary);
+  color: var(--label-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--separator-opaque); border-radius: 4px; }
+
+/* ── Difficulty Range Slider ───────────────────────────── */
+.difficulty-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(to right, var(--green) 0%, var(--yellow) 50%, var(--red) 100%);
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+.difficulty-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  cursor: grab;
+  transition: transform 0.1s;
+}
+.difficulty-slider::-webkit-slider-thumb:active { transform: scale(1.15); cursor: grabbing; }
+.difficulty-slider::-moz-range-thumb {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: white;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+/* ── Modal animation (bottom-sheet slide-up) ───────────── */
+@keyframes modal-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-modal-up { animation: modal-up 0.28s cubic-bezier(0.22,1,0.36,1) forwards; }
+
+/* ── Count-in pop ─────────────────────────────────────── */
+@keyframes count-pop {
+  0%   { opacity: 0; transform: scale(0.4); }
+  40%  { opacity: 1; transform: scale(1.05); }
+  80%  { opacity: 0.8; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+.count-pop { animation: count-pop 0.6s cubic-bezier(0.22,1,0.36,1) forwards; }
+
+/* ── Pulse glow ────────────────────────────────────────── */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(10,132,255,0); }
+  50%       { box-shadow: 0 0 20px 6px rgba(10,132,255,0.25); }
+}
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+
+/* ── iOS safe area insets ─────────────────────────────── */
+@supports (padding: max(0px)) {
+  header, nav {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ── Mobile landscape ─────────────────────────────────── */
+@media (max-width: 768px) and (orientation: landscape) {
+  .count-pop { font-size: 5rem !important; }
+}
+
+/* ── VexFlow SVG invert for dark bg ────────────────────── */
+.vexflow-dark svg {
+  filter: invert(0.85) hue-rotate(180deg);
 }
