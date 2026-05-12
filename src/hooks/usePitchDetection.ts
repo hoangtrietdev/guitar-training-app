@@ -5,45 +5,87 @@ import { isFrequencyMatch } from '@/utils/frequencyToNote';
 
 /** Autocorrelation-based pitch detection (monophonic). Returns Hz or -1 on silence. */
 function autocorrelatePitch(buffer: Float32Array, sampleRate: number): number {
-  const SIZE = buffer.length;
-  const HALF = Math.floor(SIZE / 2);
-
-  // RMS silence gate
   let rms = 0;
-  for (let i = 0; i < SIZE; i++) rms += buffer[i] * buffer[i];
-  rms = Math.sqrt(rms / SIZE);
-  if (rms < 0.01) return -1;
+  for (let i = 0; i < buffer.length; i++) {
+    rms += buffer[i] * buffer[i];
+  }
+  rms = Math.sqrt(rms / buffer.length);
+  if (rms < 0.01) return -1; // Silence gate
 
-  // Normalized difference function (simplified YIN)
-  let bestOffset = -1;
-  let bestCorr = 0;
-  let prevCorr = 1;
+  // Constrain search to typical guitar range (approx 65 Hz to 1200 Hz)
+  const minFreq = 65;
+  const maxFreq = 1200;
+  const maxOffset = Math.ceil(sampleRate / minFreq);
+  const minOffset = Math.floor(sampleRate / maxFreq);
 
-  for (let offset = 2; offset < HALF; offset++) {
+  let c0 = 0;
+  for (let i = 0; i < buffer.length; i++) {
+    c0 += buffer[i] * buffer[i];
+  }
+
+  let isRising = false;
+  let peaks: { offset: number; corr: number }[] = [];
+  let prevCorr = -1;
+
+  for (let offset = minOffset; offset <= maxOffset; offset++) {
     let corr = 0;
-    for (let i = 0; i < HALF; i++) {
-      corr += Math.abs((buffer[i]) - (buffer[i + offset]));
+    const limit = buffer.length - offset;
+    for (let i = 0; i < limit; i++) {
+      corr += buffer[i] * buffer[i + offset];
     }
-    corr = 1 - corr / HALF;
+    const normalizedCorr = corr / c0;
 
-    if (corr > 0.9 && corr > prevCorr) {
-      bestCorr = corr;
-      bestOffset = offset;
+    if (normalizedCorr > prevCorr) {
+      isRising = true;
+    } else if (isRising) {
+      // Peak detected
+      peaks.push({ offset: offset - 1, corr: prevCorr });
+      isRising = false;
     }
-    prevCorr = corr;
+    prevCorr = normalizedCorr;
   }
 
-  if (bestCorr > 0.01 && bestOffset > 0) {
-    // Parabolic interpolation for sub-sample accuracy
-    const x0 = bestOffset > 1 ? bestOffset - 1 : bestOffset;
-    const x2 = bestOffset + 1 < HALF ? bestOffset + 1 : bestOffset;
-    const y0 = 1 - ((() => { let c = 0; for (let i = 0; i < HALF; i++) c += Math.abs(buffer[i] - buffer[i + x0]); return c / HALF; })());
-    const y1 = bestCorr;
-    const y2 = 1 - ((() => { let c = 0; for (let i = 0; i < HALF; i++) c += Math.abs(buffer[i] - buffer[i + x2]); return c / HALF; })());
-    const betterOffset = x0 + (y2 - y0) / (2 * (2 * y1 - y2 - y0));
-    return sampleRate / betterOffset;
+  if (peaks.length === 0) return -1;
+
+  // Look for the *first* peak that crosses our confidence threshold
+  // This avoids picking subharmonics which appear at multiple offsets
+  const threshold = 0.85;
+  let chosenPeak = peaks.find(p => p.corr > threshold);
+
+  if (!chosenPeak) {
+    let maxP = peaks[0];
+    for (let i = 1; i < peaks.length; i++) {
+      if (peaks[i].corr > maxP.corr) maxP = peaks[i];
+    }
+    if (maxP.corr < 0.5) return -1; // Signal is too noisy/inharmonic
+    chosenPeak = maxP;
   }
-  return -1;
+
+  const T0 = chosenPeak.offset;
+  
+  // Parabolic interpolation for sub-sample accuracy
+  if (T0 > minOffset && T0 < maxOffset) {
+    const computeCorr = (off: number) => {
+      let c = 0;
+      for (let i = 0; i < buffer.length - off; i++) {
+        c += buffer[i] * buffer[i + off];
+      }
+      return c / c0;
+    };
+    
+    const x1 = computeCorr(T0 - 1);
+    const x2 = chosenPeak.corr;
+    const x3 = computeCorr(T0 + 1);
+
+    const a = (x1 + x3 - 2 * x2) / 2;
+    const b = (x3 - x1) / 2;
+    if (a !== 0) {
+      const betterOffset = T0 - b / (2 * a);
+      return sampleRate / betterOffset;
+    }
+  }
+
+  return sampleRate / T0;
 }
 
 export function usePitchDetection() {
