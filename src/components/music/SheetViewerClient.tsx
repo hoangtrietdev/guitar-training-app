@@ -24,9 +24,10 @@ interface Props {
   results: NoteResult[];
   currentNoteIndex: number;
   scaleLabel: string;
+  renderScale?: number;
 }
 
-export function SheetViewerClient({ notes, results, currentNoteIndex, scaleLabel }: Props) {
+export function SheetViewerClient({ notes, results, currentNoteIndex, scaleLabel, renderScale = 1 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,8 +53,9 @@ export function SheetViewerClient({ notes, results, currentNoteIndex, scaleLabel
       const TOTAL_HEIGHT = 140;
 
       const renderer = new Renderer(container, Renderer.Backends.SVG);
-      renderer.resize(TOTAL_WIDTH, TOTAL_HEIGHT);
+      renderer.resize(TOTAL_WIDTH * renderScale, TOTAL_HEIGHT * renderScale);
       const ctx = renderer.getContext();
+      ctx.scale(renderScale, renderScale);
       (ctx as SVGContext).setFont('Inter', 10);
 
       // ── Treble staff ──
@@ -89,7 +91,7 @@ export function SheetViewerClient({ notes, results, currentNoteIndex, scaleLabel
         svg.style.background = 'transparent';
       }
     })();
-  }, [notes, results, currentNoteIndex, scaleLabel]);
+  }, [notes, results, currentNoteIndex, scaleLabel, renderScale]);
 
   return (
     <div className="w-full h-full flex items-center justify-start bg-[#F8F9FA] rounded-xl overflow-hidden shadow-inner">

@@ -13,7 +13,7 @@ import { Metronome } from '@/components/music/Metronome';
 import { PitchDebugPanel } from '@/components/music/PitchDebugPanel';
 import { MicPermissionModal } from '@/components/setup/MicPermissionModal';
 import type { KeyName, ScaleType } from '@/types/music';
-import { ArrowLeft, Play, Square, RotateCcw, Bug, Mic, RefreshCw, Loader2 } from 'lucide-react';
+import { ArrowLeft, Play, Square, RotateCcw, Mic, RefreshCw, Loader2 } from 'lucide-react';
 import { cn } from '@/utils/classnames';
 
 export default function PracticePage() {
@@ -33,10 +33,39 @@ export default function PracticePage() {
   useExerciseGenerator();
 
   const [micGranted, setMicGranted] = useState(false);
+  const [micActive, setMicActive] = useState(false);
   const [showMicModal, setShowMicModal] = useState(false);
-  const [showDebug, setShowDebug] = useState(true);
   const [looping, setLooping] = useState(true);
   const [countInDisplay, setCountInDisplay] = useState<number | null>(null);
+
+  const [isMobile, setIsMobile] = useState(false);
+  const [showLandscapePrompt, setShowLandscapePrompt] = useState(false);
+  const [renderScale, setRenderScale] = useState(1);
+  const [mobileView, setMobileView] = useState<'sheet' | 'tablature' | 'fretboard'>('sheet');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const updateScale = () => {
+        const h = window.innerHeight;
+        const w = window.innerWidth;
+        if (h < 450) setRenderScale(0.65);
+        else if (w < 768) setRenderScale(0.8);
+        else setRenderScale(1);
+      };
+      
+      updateScale();
+      window.addEventListener('resize', updateScale);
+      
+      const isMob = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      setIsMobile(isMob);
+      if (isMob) {
+        setShowLandscapePrompt(true);
+      }
+      
+      return () => window.removeEventListener('resize', updateScale);
+    }
+  }, []);
+
 
   // Sync route params
   useEffect(() => {
@@ -56,9 +85,12 @@ export default function PracticePage() {
 
   // ── Loop: when 'finished', restart automatically if looping ──
   const loopingRef = useRef(looping);
-  loopingRef.current = looping;
   const micGrantedRef = useRef(micGranted);
-  micGrantedRef.current = micGranted;
+  
+  useEffect(() => {
+    loopingRef.current = looping;
+    micGrantedRef.current = micGranted;
+  }, [looping, micGranted]);
 
   useEffect(() => {
     if (phase === 'finished' && loopingRef.current && notes.length > 0 && !isLoadingExercise) {
@@ -77,11 +109,24 @@ export default function PracticePage() {
 
   const handleStop = () => { 
     stopMetronome(); 
-    stopPitch(); 
     reset();
     setLooping(false);
   };
   const handleReset = () => { handleStop(); };
+
+  const toggleMic = async () => {
+    if (!micGranted) {
+      setShowMicModal(true);
+      return;
+    }
+    if (micActive) {
+      setMicActive(false);
+      stopPitch();
+    } else {
+      setMicActive(true);
+      await startPitch();
+    }
+  };
 
   const isIdle = phase === 'idle' || phase === 'finished';
   const label = getScaleLabel(key, scale);
@@ -101,10 +146,9 @@ export default function PracticePage() {
         onClose={() => setShowMicModal(false)}
         onGranted={async () => {
           setMicGranted(true);
+          setMicActive(true);
           setShowMicModal(false);
-          reset();
           await startPitch();
-          await startMetronome();
         }}
       />
 
@@ -114,6 +158,24 @@ export default function PracticePage() {
           <span key={countInDisplay} className="count-pop select-none text-[9rem] font-black text-[#FF9F0A] drop-shadow-[0_0_60px_rgba(255,159,10,0.8)]">
             {countInDisplay}
           </span>
+        </div>
+      )}
+
+      {/* Landscape Prompt for Mobile */}
+      {showLandscapePrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+          <div className="bg-[#1C1C1E] border border-white/[0.1] p-6 rounded-3xl max-w-sm w-full text-center shadow-2xl">
+            <h2 className="text-[18px] font-bold text-white mb-2">Rotate your device</h2>
+            <p className="text-[13px] text-gray-400 mb-6">
+              For the best practice experience, please use <strong>Landscape</strong> mode. We have optimized the interface to focus entirely on the Sheet & Tablature on mobile screens.
+            </p>
+            <button
+              onClick={() => setShowLandscapePrompt(false)}
+              className="w-full bg-[#0A84FF] text-white py-3 rounded-2xl font-semibold text-[15px] active:scale-[0.98] transition-transform"
+            >
+              Got it
+            </button>
+          </div>
         </div>
       )}
 
@@ -149,25 +211,17 @@ export default function PracticePage() {
             <Metronome />
 
             <button
-              onClick={() => setShowMicModal(true)}
-              className={cn('rounded-full p-1.5 transition-colors', micGranted ? 'text-[#30D158]' : 'text-gray-500 hover:text-gray-300')}
-              aria-label="Microphone settings"
+              onClick={toggleMic}
+              className={cn('rounded-full p-1.5 transition-colors', micActive ? 'text-[#30D158]' : 'text-gray-500 hover:text-gray-300')}
+              aria-label="Toggle microphone"
             >
               <Mic className="h-4 w-4" />
-            </button>
-
-            <button
-              onClick={() => setShowDebug(v => !v)}
-              className={cn('rounded-full p-1.5 transition-colors', showDebug ? 'text-[#0A84FF]' : 'text-gray-600 hover:text-gray-400')}
-              aria-label="Toggle debug"
-            >
-              <Bug className="h-4 w-4" />
             </button>
           </div>
         </header>
 
         {/* Debug bar */}
-        {showDebug && (
+        {micActive && (
           <div className="shrink-0 px-3 py-1.5 bg-[#0A0A0A] border-b border-white/[0.06]">
             <PitchDebugPanel />
           </div>
@@ -182,24 +236,53 @@ export default function PracticePage() {
         )}
 
         {/* ── MAIN — two full-width rows ──────────────── */}
-        <main className="flex flex-col flex-1 overflow-hidden min-h-0">
+        <main className="flex flex-col flex-1 overflow-y-auto min-h-0 custom-scrollbar pb-20 md:pb-0">
 
           {notes.length > 0 ? (
             <>
-              {/* TOP ROW — Fretboard (50%) */}
-              <section className="flex flex-col w-full flex-[2] min-h-[150px] border-b border-white/[0.06] overflow-hidden px-3 pt-2 pb-1">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-600 mb-1 shrink-0">Fretboard</p>
-                <div className="flex-1 overflow-y-auto flex flex-col justify-center">
-                  <Fretboard notes={notes} results={results} currentNoteIndex={currentNoteIndex} />
+              {/* Mobile View Toggle */}
+              {isMobile && (
+                <div className="flex justify-center shrink-0 pt-3 pb-2 border-b border-white/[0.06]">
+                  <div className="flex bg-[#1C1C1E] rounded-full p-1 border border-white/[0.05]">
+                    <button 
+                      onClick={() => setMobileView('sheet')} 
+                      className={cn('px-5 py-1.5 text-[12px] font-semibold rounded-full transition-colors', mobileView === 'sheet' ? 'bg-[#0A84FF] text-white shadow-sm' : 'text-gray-400 hover:text-gray-200')}
+                    >
+                      Sheet
+                    </button>
+                    <button 
+                      onClick={() => setMobileView('tablature')} 
+                      className={cn('px-5 py-1.5 text-[12px] font-semibold rounded-full transition-colors', mobileView === 'tablature' ? 'bg-[#0A84FF] text-white shadow-sm' : 'text-gray-400 hover:text-gray-200')}
+                    >
+                      Tab
+                    </button>
+                    <button 
+                      onClick={() => setMobileView('fretboard')} 
+                      className={cn('px-5 py-1.5 text-[12px] font-semibold rounded-full transition-colors', mobileView === 'fretboard' ? 'bg-[#0A84FF] text-white shadow-sm' : 'text-gray-400 hover:text-gray-200')}
+                    >
+                      Fretboard
+                    </button>
+                  </div>
                 </div>
-              </section>
+              )}
 
-              {/* BOTTOM ROW — Notation & Tablature (50%) */}
-              <section className="flex flex-col w-full flex-[3] min-h-[200px] overflow-hidden">
+              {/* TOP ROW — Fretboard */}
+              {(!isMobile || mobileView === 'fretboard') && (
+                <section className={cn("flex flex-col w-full overflow-hidden px-3 pt-2 pb-1 shrink-0", isMobile ? "flex-none min-h-[250px]" : "flex-[2] min-h-[150px] border-b border-white/[0.06]")}>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-600 mb-1 shrink-0">Fretboard</p>
+                  <div className="flex-1 overflow-y-auto flex flex-col justify-center">
+                    <Fretboard notes={notes} results={results} currentNoteIndex={currentNoteIndex} />
+                  </div>
+                </section>
+              )}
+
+              {/* BOTTOM ROW — Notation & Tablature (100% on mobile, 60% on desktop) */}
+              {(!isMobile || mobileView === 'sheet' || mobileView === 'tablature') && (
+                <section className="flex flex-col w-full flex-none md:flex-[3] md:min-h-[200px] shrink-0">
                 <div className="shrink-0 flex items-center justify-between gap-2 px-3 pt-2 pb-2 border-b border-white/[0.06]">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">
-                      Sheet & Tablature
+                      {isMobile ? (mobileView === 'sheet' ? 'Sheet Music' : 'Tablature') : 'Sheet & Tablature'}
                     </p>
                     <span className="text-[10px] text-gray-700">— follow the amber playhead</span>
                   </div>
@@ -208,32 +291,39 @@ export default function PracticePage() {
                   )}
                 </div>
 
-                <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden custom-scrollbar">
-                  <div className="flex flex-col min-w-max h-full pt-4 mx-auto" style={{ width: 'fit-content' }}>
+                <div className="w-full overflow-x-auto custom-scrollbar pb-6">
+                  <div className="flex flex-col min-w-max pt-2 mx-auto origin-top" style={{ width: 'fit-content' }}>
                     {/* Notation wrapper */}
-                    <div className="h-[140px] shrink-0 border-b border-white/[0.04] flex items-center">
-                      <SheetViewer
-                        notes={notes}
-                        results={results}
-                        currentNoteIndex={currentNoteIndex}
-                        scaleLabel={label}
-                      />
-                    </div>
+                    {(!isMobile || mobileView === 'sheet') && (
+                      <div className={cn("shrink-0 flex items-center pb-2", !isMobile && "border-b border-white/[0.04]")}>
+                        <SheetViewer
+                          notes={notes}
+                          results={results}
+                          currentNoteIndex={currentNoteIndex}
+                          scaleLabel={label}
+                          renderScale={renderScale}
+                        />
+                      </div>
+                    )}
                     {/* Tablature wrapper */}
-                    <div className="flex-1 flex items-start pt-4 px-3">
-                      <TabViewer
-                        notes={notes}
-                        results={results}
-                        currentNoteIndex={currentNoteIndex}
-                        scaleLabel={label}
-                        tempo={tempo}
-                        phase={phase}
-                        playStartAudioTime={playStartAudioTime}
-                      />
-                    </div>
+                    {(!isMobile || mobileView === 'tablature') && (
+                      <div className={cn("flex items-start px-3", isMobile ? "pt-2" : "pt-4")}>
+                        <TabViewer
+                          notes={notes}
+                          results={results}
+                          currentNoteIndex={currentNoteIndex}
+                          scaleLabel={label}
+                          tempo={tempo}
+                          phase={phase}
+                          playStartAudioTime={playStartAudioTime}
+                          renderScale={renderScale}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </section>
+              )}
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-gray-600 text-[14px] gap-3">

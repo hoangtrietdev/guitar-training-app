@@ -21,9 +21,10 @@ interface TabViewerProps {
   tempo: number;
   phase: string;
   playStartAudioTime: number | null;
+  renderScale?: number;
 }
 
-export function TabViewer({ notes, results, currentNoteIndex, scaleLabel, tempo, phase, playStartAudioTime }: TabViewerProps) {
+export function TabViewer({ notes, results, currentNoteIndex, scaleLabel, tempo, phase, playStartAudioTime, renderScale = 1 }: TabViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
 
@@ -40,8 +41,9 @@ export function TabViewer({ notes, results, currentNoteIndex, scaleLabel, tempo,
     const ctx2d = canvas.getContext('2d');
     if (!ctx2d) return;
 
-    const W = canvas.width;
-    const H = canvas.height;
+    const logicalW = Math.max(720, notes.length * NOTE_W + 80);
+    const W = logicalW * renderScale;
+    const H = HEIGHT * renderScale;
 
     // ── Smooth playhead interpolation ──────────────────────
     let playheadX = LEFT + currentNoteIndex * NOTE_W + NOTE_W / 2;
@@ -54,11 +56,13 @@ export function TabViewer({ notes, results, currentNoteIndex, scaleLabel, tempo,
       playheadX = LEFT + smoothIdx * NOTE_W + NOTE_W / 2;
     }
 
+    ctx2d.resetTransform();
     ctx2d.clearRect(0, 0, W, H);
+    ctx2d.scale(renderScale, renderScale);
 
     // Background
     ctx2d.fillStyle = '#0A0A0A';
-    ctx2d.fillRect(0, 0, W, H);
+    ctx2d.fillRect(0, 0, logicalW, HEIGHT);
 
     // Scale label
     ctx2d.fillStyle = 'rgba(255,255,255,0.2)';
@@ -80,7 +84,7 @@ export function TabViewer({ notes, results, currentNoteIndex, scaleLabel, tempo,
       ctx2d.lineWidth = 0.5 + (STRINGS - s - 1) * 0.2;
       ctx2d.beginPath();
       ctx2d.moveTo(LEFT, y);
-      ctx2d.lineTo(W - 16, y);
+      ctx2d.lineTo(logicalW - 16, y);
       ctx2d.stroke();
     }
 
@@ -164,7 +168,7 @@ export function TabViewer({ notes, results, currentNoteIndex, scaleLabel, tempo,
     ctx2d.lineTo(playheadX, TOP - 8);
     ctx2d.closePath();
     ctx2d.fill();
-  }, [notes, results, currentNoteIndex, scaleLabel, tempo, phase, playStartAudioTime, NOTE_W, LEFT, TOP, GAP, STRINGS]);
+  }, [notes, results, currentNoteIndex, scaleLabel, tempo, phase, playStartAudioTime, NOTE_W, LEFT, TOP, GAP, STRINGS, renderScale]);
 
   // Animation loop
   useEffect(() => {
@@ -182,12 +186,12 @@ export function TabViewer({ notes, results, currentNoteIndex, scaleLabel, tempo,
     <div className="w-full h-full">
       <canvas
         ref={canvasRef}
-        width={canvasWidth}
-        height={HEIGHT}
+        width={canvasWidth * renderScale}
+        height={HEIGHT * renderScale}
         aria-label="Guitar tablature"
         role="img"
         className="block"
-        style={{ minWidth: canvasWidth, height: HEIGHT }}
+        style={{ minWidth: canvasWidth * renderScale, height: HEIGHT * renderScale }}
       />
     </div>
   );

@@ -12,6 +12,7 @@ interface SheetViewerProps {
   results: NoteResult[];
   currentNoteIndex: number;
   scaleLabel: string;
+  renderScale?: number;
 }
 
 export function SheetViewer(props: SheetViewerProps) {
