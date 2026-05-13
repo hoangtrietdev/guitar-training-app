@@ -69,7 +69,7 @@ export default function PracticePage() {
 
   // Sync route params
   useEffect(() => {
-    if (rKey) setKey(rKey as KeyName);
+    if (rKey) setKey(decodeURIComponent(rKey) as KeyName);
     if (rScale) setScale(rScale as ScaleType);
   }, [rKey, rScale, setKey, setScale]);
 

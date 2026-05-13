@@ -6,9 +6,10 @@ function toVexString(ourString: number): number {
   return 6 - ourString; // 0→6, 5→1
 }
 
-// Map note name + octave to VexFlow key string like "c/4"
 function toVexKey(noteName: string, octave: number): string {
-  return `${noteName.replace('#', '#').toLowerCase()}/${octave}`;
+  // Extract just the letter for the key, VexFlow accidentals are added separately
+  const letter = noteName.charAt(0).toLowerCase();
+  return `${letter}/${octave}`;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -41,7 +42,7 @@ export function SheetViewerClient({ notes, results, currentNoteIndex, scaleLabel
         return;
       }
 
-      const { Renderer, Stave, StaveNote, TabStave, TabNote, Voice, Formatter } = Vex;
+      const { Renderer, Stave, StaveNote, Accidental, Voice, Formatter } = Vex;
 
       const container = containerRef.current!;
       container.innerHTML = '';
@@ -74,6 +75,13 @@ export function SheetViewerClient({ notes, results, currentNoteIndex, scaleLabel
           duration: 'q',
           autoStem: true,
         });
+        
+        if (note.noteName.includes('#')) {
+          sn.addModifier(new Accidental('#'), 0);
+        } else if (note.noteName.includes('b')) {
+          sn.addModifier(new Accidental('b'), 0);
+        }
+
         sn.setStyle({ fillStyle: color, strokeStyle: color });
         return sn;
       });
